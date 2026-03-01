@@ -1,0 +1,7 @@
+.env
+storage/
+data/
+nginx/certs/
+__pycache__/
+*.pyc
+.venv/

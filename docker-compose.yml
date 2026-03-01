@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    env_file: .env
+    volumes:
+      - vault-storage:/app/storage
+      - vault-data:/app/data
+    networks:
+      - vault-net
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    networks:
+      - vault-net
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    env_file: .env
+    depends_on:
+      - nginx
+    networks:
+      - vault-net
+    restart: unless-stopped
+
+volumes:
+  vault-storage:
+  vault-data:
+
+networks:
+  vault-net:

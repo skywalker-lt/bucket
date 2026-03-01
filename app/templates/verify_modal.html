@@ -1,0 +1,28 @@
+<div id="verify-modal" class="modal hidden">
+    <div id="modal-backdrop" class="modal-backdrop"></div>
+    <div class="modal-content">
+        <h3>Verify to Download</h3>
+        <p>Choose a verification method:</p>
+        <div id="verify-status" class="status-msg hidden"></div>
+
+        <div class="verify-options">
+            <button id="btn-verify-passkey" class="btn btn-primary">
+                Verify with Passkey
+            </button>
+
+            <div id="sms-section" class="sms-section hidden">
+                <hr>
+                <button class="btn btn-secondary" id="btn-send-sms">
+                    Send SMS Code
+                </button>
+                <div id="sms-input-group" class="hidden">
+                    <input type="text" id="sms-code" placeholder="Enter 6-digit code"
+                           maxlength="6" pattern="[0-9]{6}">
+                    <button id="btn-verify-sms" class="btn btn-primary">Verify</button>
+                </div>
+            </div>
+        </div>
+
+        <button id="btn-cancel-modal" class="btn btn-cancel">Cancel</button>
+    </div>
+</div>

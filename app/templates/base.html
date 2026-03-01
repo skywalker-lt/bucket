@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CatVault{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css?v=12">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CatVault</h1>
+            {% block header_extra %}{% endblock %}
+        </header>
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="/static/app.js?v=12"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
