@@ -145,6 +145,24 @@ async def upload_complete(
     return {"status": "ok"}
 
 
+@router.post("/delete/{file_id}")
+async def delete_file(
+    file_id: str,
+    session: str = Depends(get_current_session),
+):
+    """Delete a file from disk and database."""
+    file_meta = await database.get_file(file_id)
+    if not file_meta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    filepath = os.path.join(settings.storage_path, file_meta["stored_name"])
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    await database.delete_file(file_id)
+    return {"status": "ok"}
+
+
 @router.post("/upload")
 async def upload_file(
     request: Request,

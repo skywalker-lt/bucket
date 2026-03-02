@@ -77,6 +77,19 @@ async def get_file(file_id: str) -> dict | None:
         return dict(row) if row else None
 
 
+async def delete_file(file_id: str) -> dict | None:
+    async with aiosqlite.connect(_db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM files WHERE id = ?", (file_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        record = dict(row)
+        await db.execute("DELETE FROM files WHERE id = ?", (file_id,))
+        await db.commit()
+        return record
+
+
 # --- WebAuthn Credentials ---
 
 async def store_credential(credential_id: str, public_key: bytes, sign_count: int) -> str:

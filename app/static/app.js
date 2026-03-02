@@ -430,6 +430,23 @@ function triggerDownload(fileId, token) {
     document.body.removeChild(a);
 }
 
+// --- Delete File ---
+async function deleteFile(fileId) {
+    if (!window.confirm('Are you sure you want to delete this file? This cannot be undone.')) {
+        return;
+    }
+    try {
+        var resp = await fetch('/vault/delete/' + encodeURIComponent(fileId), { method: 'POST' });
+        if (!resp.ok) {
+            var err = await resp.json();
+            throw new Error(err.detail || 'Delete failed');
+        }
+        window.location.reload();
+    } catch (e) {
+        showStatus('status-msg', 'Delete error: ' + e.message, 'error');
+    }
+}
+
 // --- Event delegation: single click handler on document ---
 document.addEventListener('click', function(e) {
     var target = e.target;
@@ -453,6 +470,13 @@ document.addEventListener('click', function(e) {
     if (dlBtn) {
         var fileId = dlBtn.getAttribute('data-file-id');
         if (fileId) requestDownload(fileId);
+        return;
+    }
+
+    var delBtn = match('.btn-delete');
+    if (delBtn) {
+        var fileId = delBtn.getAttribute('data-file-id');
+        if (fileId) deleteFile(fileId);
     }
 });
 
