@@ -212,84 +212,104 @@ function uploadChunkXHR(url, formData, onProgress) {
     });
 }
 
+var MAX_FILES = 10;
+
+async function uploadSingleFile(file, fileLabel) {
+    var totalSize = file.size;
+    var totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+
+    // Step 1: Start upload
+    showProgress(0, totalSize, fileLabel + ' — Starting...');
+    var startResp = await fetch('/vault/upload/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            filename: file.name,
+            total_size: totalSize,
+            total_chunks: totalChunks
+        })
+    });
+    if (!startResp.ok) {
+        var err = await startResp.json();
+        throw new Error(file.name + ': ' + (err.detail || 'Failed to start upload'));
+    }
+    var startData = await startResp.json();
+    var uploadId = startData.upload_id;
+
+    // Step 2: Upload chunks
+    var totalUploaded = 0;
+    for (var i = 0; i < totalChunks; i++) {
+        var start = i * CHUNK_SIZE;
+        var end = Math.min(start + CHUNK_SIZE, totalSize);
+        var chunk = file.slice(start, end);
+        var chunkSize = end - start;
+
+        var formData = new FormData();
+        formData.append('upload_id', uploadId);
+        formData.append('chunk_index', i.toString());
+        formData.append('file', chunk, 'chunk');
+
+        var chunkLabel = 'Chunk ' + (i + 1) + '/' + totalChunks;
+        var baseUploaded = totalUploaded;
+
+        await uploadChunkXHR('/vault/upload/chunk', formData, function(loaded, total) {
+            showProgress(baseUploaded + loaded, totalSize, fileLabel + ' — ' + chunkLabel);
+        });
+
+        totalUploaded += chunkSize;
+        showProgress(totalUploaded, totalSize, fileLabel + ' — ' + chunkLabel + ' done');
+    }
+
+    // Step 3: Finalize
+    showProgress(totalSize, totalSize, fileLabel + ' — Encrypting and saving...');
+    var completeResp = await fetch('/vault/upload/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload_id: uploadId })
+    });
+    if (!completeResp.ok) {
+        var completeErr = await completeResp.json();
+        throw new Error(file.name + ': ' + (completeErr.detail || 'Failed to finalize upload'));
+    }
+
+    showProgress(totalSize, totalSize, fileLabel + ' — Complete!');
+}
+
 async function uploadFile(event) {
     event.preventDefault();
     hideStatus('status-msg');
     var fileInput = document.getElementById('file-input');
     if (!fileInput.files.length) return;
 
-    var file = fileInput.files[0];
+    var files = Array.from(fileInput.files);
+    if (files.length > MAX_FILES) {
+        showStatus('status-msg', 'Maximum ' + MAX_FILES + ' files at a time.', 'error');
+        return;
+    }
+
     var submitBtn = document.querySelector('#upload-form button[type="submit"]');
     var originalText = submitBtn.textContent;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Uploading...';
 
-    var totalSize = file.size;
-    var totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
-
-    try {
-        // Step 1: Start upload
-        showProgress(0, totalSize, 'Starting...');
-        var startResp = await fetch('/vault/upload/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                filename: file.name,
-                total_size: totalSize,
-                total_chunks: totalChunks
-            })
-        });
-        if (!startResp.ok) {
-            var err = await startResp.json();
-            throw new Error(err.detail || 'Failed to start upload');
+    var failed = [];
+    for (var f = 0; f < files.length; f++) {
+        var fileLabel = 'File ' + (f + 1) + '/' + files.length + ' (' + files[f].name + ')';
+        try {
+            await uploadSingleFile(files[f], fileLabel);
+        } catch (e) {
+            failed.push(e.message);
         }
-        var startData = await startResp.json();
-        var uploadId = startData.upload_id;
+    }
 
-        // Step 2: Upload chunks
-        var totalUploaded = 0;
-        for (var i = 0; i < totalChunks; i++) {
-            var start = i * CHUNK_SIZE;
-            var end = Math.min(start + CHUNK_SIZE, totalSize);
-            var chunk = file.slice(start, end);
-            var chunkSize = end - start;
-
-            var formData = new FormData();
-            formData.append('upload_id', uploadId);
-            formData.append('chunk_index', i.toString());
-            formData.append('file', chunk, 'chunk');
-
-            var chunkLabel = 'Chunk ' + (i + 1) + '/' + totalChunks;
-            var baseUploaded = totalUploaded;
-
-            await uploadChunkXHR('/vault/upload/chunk', formData, function(loaded, total) {
-                showProgress(baseUploaded + loaded, totalSize, chunkLabel);
-            });
-
-            totalUploaded += chunkSize;
-            showProgress(totalUploaded, totalSize, chunkLabel + ' done');
-        }
-
-        // Step 3: Finalize
-        showProgress(totalSize, totalSize, 'Encrypting and saving...');
-        var completeResp = await fetch('/vault/upload/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ upload_id: uploadId })
-        });
-        if (!completeResp.ok) {
-            var completeErr = await completeResp.json();
-            throw new Error(completeErr.detail || 'Failed to finalize upload');
-        }
-
-        showProgress(totalSize, totalSize, 'Complete!');
-        showStatus('status-msg', 'Upload complete!', 'success');
-        setTimeout(function() { window.location.reload(); }, 500);
-    } catch (e) {
-        showStatus('status-msg', e.message, 'error');
+    if (failed.length) {
+        showStatus('status-msg', 'Some uploads failed: ' + failed.join('; '), 'error');
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
         hideProgress();
+    } else {
+        showStatus('status-msg', files.length === 1 ? 'Upload complete!' : 'All ' + files.length + ' files uploaded!', 'success');
+        setTimeout(function() { window.location.reload(); }, 500);
     }
 }
 
